@@ -12,7 +12,7 @@ PADDING_Y = 24
 RADIUS = 32
 TAIL_WIDTH = 22
 TAIL_HEIGHT = 24
-OUTER_MARGIN = 8
+OUTER_MARGIN = 2
 MAX_CHARS_PER_LINE = 16
 LINE_SPACING = 10
 
@@ -101,7 +101,7 @@ def generate_bubble_image(text: str, speaker: str = "self") -> Image.Image:
     image_width = bubble_width + TAIL_WIDTH + OUTER_MARGIN * 2
     image_height = bubble_height + OUTER_MARGIN * 2
 
-    image = Image.new("RGBA", (image_width, image_height), (255, 255, 255, 0))
+    image = Image.new("RGBA", (image_width, image_height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
 
     is_self = speaker == "self"
@@ -147,7 +147,11 @@ def generate_bubble_image(text: str, speaker: str = "self") -> Image.Image:
             draw.text((text_x - bbox[0], text_y - bbox[1]), line, fill=TEXT_COLOR, font=font)
         text_y += bbox[3] - bbox[1] + LINE_SPACING
 
-    return image
+    content_bbox = image.getchannel("A").getbbox()
+    if content_bbox is None:
+        return image
+
+    return image.crop(content_bbox)
 
 
 def to_png_bytes(image: Image.Image) -> bytes:
