@@ -61,29 +61,31 @@ def wrap_text(text: str, max_chars: int = MAX_CHARS_PER_LINE) -> list[str]:
     return lines
 
 
-def _line_size(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont) -> tuple[int, int]:
+def _line_bbox(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont) -> tuple[int, int, int, int]:
     if text == "":
-        bbox = draw.textbbox((0, 0), "あ", font=font)
-        return 0, bbox[3] - bbox[1]
+        return draw.textbbox((0, 0), "あ", font=font)
 
-    bbox = draw.textbbox((0, 0), text, font=font)
-    return bbox[2] - bbox[0], bbox[3] - bbox[1]
+    return draw.textbbox((0, 0), text, font=font)
 
 
-def _measure_lines(lines: list[str], font: ImageFont.ImageFont) -> tuple[int, int, list[int]]:
+def _measure_lines(lines: list[str], font: ImageFont.ImageFont) -> tuple[int, int, list[tuple[int, int, int, int]]]:
     measurement_image = Image.new("RGBA", (1, 1))
     draw = ImageDraw.Draw(measurement_image)
 
     widths: list[int] = []
     heights: list[int] = []
+    bboxes: list[tuple[int, int, int, int]] = []
     for line in lines:
-        width, height = _line_size(draw, line, font)
+        bbox = _line_bbox(draw, line, font)
+        width = bbox[2] - bbox[0] if line else 0
+        height = bbox[3] - bbox[1]
         widths.append(width)
         heights.append(height)
+        bboxes.append(bbox)
 
     text_width = max(widths, default=0)
     text_height = sum(heights) + LINE_SPACING * max(len(lines) - 1, 0)
-    return text_width, text_height, heights
+    return text_width, text_height, bboxes
 
 
 def generate_bubble_image(text: str, speaker: str = "self") -> Image.Image:
@@ -92,7 +94,7 @@ def generate_bubble_image(text: str, speaker: str = "self") -> Image.Image:
 
     font = load_font()
     lines = wrap_text(text)
-    text_width, text_height, line_heights = _measure_lines(lines, font)
+    text_width, text_height, line_bboxes = _measure_lines(lines, font)
 
     bubble_width = max(text_width + PADDING_X * 2, RADIUS * 2)
     bubble_height = max(text_height + PADDING_Y * 2, RADIUS * 2)
@@ -140,8 +142,10 @@ def generate_bubble_image(text: str, speaker: str = "self") -> Image.Image:
     text_x = bubble_box[0] + PADDING_X
     text_y = bubble_box[1] + PADDING_Y
     for index, line in enumerate(lines):
-        draw.text((text_x, text_y), line, fill=TEXT_COLOR, font=font)
-        text_y += line_heights[index] + LINE_SPACING
+        bbox = line_bboxes[index]
+        if line:
+            draw.text((text_x - bbox[0], text_y - bbox[1]), line, fill=TEXT_COLOR, font=font)
+        text_y += bbox[3] - bbox[1] + LINE_SPACING
 
     return image
 
